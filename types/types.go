@@ -10,18 +10,20 @@ type RSAKeysConfig struct {
 	PublicKey  string `json:"-"`
 }
 
-type Connection struct {
-	Type          string `json:"type"`
-	DNS           string `json:"dns,omitempty"`
-	PublicKeyDigest     string `json:"public_key_digest"`
+type Peer struct {
 	PublicKey     string `json:"public_key"`
-	WGPublicKey   string `json:"wg_public_key"`
-	WGAddress     string `json:"wg_address,omitempty"`
-	WGNetworkBlock string `json:"wg_network_block,omitempty"`
+	Address     string `json:"address,omitempty"`
+	Endpoint     string `json:"endpoint"`
+}
+
+type Network struct {
+	NetworkBlock string `json:"network_block,omitempty"`
+	Address string `json:"address,omitempty"`
+	Peers []Peer `json:"peers"`
 }
 
 type ConnectionsConfig struct {
-	Connections []Connection `json:"connections"`
+	Networks []Network `json:"networks"`
 	AllowedKeys []string     `json:"allowed_keys,omitempty"`
 }
 

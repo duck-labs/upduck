@@ -29,7 +29,9 @@ var (
 )
 
 func getConfigDir() string {
-	if dir := os.Getenv("UPDUCK_CONFIG_DIR"); dir != "" {
+	dir := os.Getenv("UPDUCK_CONFIG_DIR")
+
+	if dir != "" {
 		return dir
 	}
 
@@ -145,7 +147,7 @@ func LoadConnectionsConfig() (*types.ConnectionsConfig, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &types.ConnectionsConfig{
-				Connections: []types.Connection{},
+				Networks:    []types.Network{},
 				AllowedKeys: []string{},
 			}, nil
 		}
@@ -266,9 +268,12 @@ func CreateNginxConfig(domain, serverIP, port string) error {
 
 func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, networkBlock *net.IPNet) (*net.IPNet, error) {
 	used := make(map[uint32]bool)
-	for _, conn := range connectionsConfig.Connections {
-		ipInt := binary.BigEndian.Uint32([]byte(conn.WGAddress))
+
+	if len(connectionsConfig.Networks) > 0 {
+		for _, peer := range connectionsConfig.Networks[0].Peers {
+			ipInt := binary.BigEndian.Uint32([]byte(peer.Address))
 		used[ipInt] = true
+		}
 	}
 
 	netIP := networkBlock.IP.To4()
@@ -285,4 +290,7 @@ func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, 
 	}
 
 	return nil, fmt.Errorf("no allocatable address")
+}
+
+func WriteWireguardInterface() {
 }

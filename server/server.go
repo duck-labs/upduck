@@ -1,33 +1,47 @@
 package server
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"time"
 
 	"github.com/duck-labs/upduck-v2/types"
 	"github.com/duck-labs/upduck-v2/utils"
 )
 
 type Server struct {
-	nodeType string
-	port     string
+	nodeType            string
+	port                string
+	fileWatcherCtx      context.Context
+	fileWatcherCancel   context.CancelFunc
+	lastConnectionsHash string
 }
 
 func NewServer(nodeType, port string) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
-		nodeType: nodeType,
-		port:     port,
+		nodeType:          nodeType,
+		port:              port,
+		fileWatcherCtx:    ctx,
+		fileWatcherCancel: cancel,
 	}
 }
 
 func (s *Server) Start() error {
+	go s.watchConnectionsFile()
+
 	http.HandleFunc("/api/servers/connect", s.handleServerConnect)
 	http.HandleFunc("/health", s.handleHealth)
 
 	log.Printf("Starting UpDuck %s server on port %s", s.nodeType, s.port)
+	log.Printf("File watcher started for connections config")
 	return http.ListenAndServe(":"+s.port, nil)
 }
 
@@ -90,27 +104,35 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var newNetwork types.Network
+
+	if len(connectionsConfig.Networks) == 0 {
+		newNetwork = types.Network{}
+	} else {
+		newNetwork = connectionsConfig.Networks[0]
+	}
+
+	newNetwork.Address = wgNetworkBlock.String()
+
+	newPeer := types.Peer{
+		PublicKey: request.WGPublicKey,
+		Address:   wgAddress.String(),
+	}
+
+	newNetwork.Peers = append(newNetwork.Peers, newPeer)
+	connectionsConfig.Networks = []types.Network{newNetwork}
+
+	if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
+		log.Printf("Error saving connections config: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	response := types.ConnectResponse{
 		WGPublicKey:    wgConfig.PublicKey,
 		WGNetworkBlock: wgNetworkBlock.String(),
 		WGAddress:      wgAddress.String(),
 		PublicKey:      wgConfig.PublicKey,
-	}
-
-	newConnection := types.Connection{
-		Type:            "server",
-		PublicKeyDigest: pubKeyDigest,
-		PublicKey:       request.PublicKey,
-		WGPublicKey:     request.WGPublicKey,
-		WGAddress:       wgAddress.String(),
-		WGNetworkBlock:  wgNetworkBlock.String(),
-	}
-
-	connectionsConfig.Connections = append(connectionsConfig.Connections, newConnection)
-	if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
-		log.Printf("Error saving connections config: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -121,6 +143,61 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("✅ Server connected: %s", utils.GetPublicKeyDigest(request.PublicKey))
+}
+
+func (s *Server) watchConnectionsFile() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	s.lastConnectionsHash = s.getConnectionsFileHash()
+	log.Printf("Started watching connections file: %s", utils.ConnectionsConfigFile)
+
+	for {
+		select {
+		case <-s.fileWatcherCtx.Done():
+			log.Printf("File watcher stopped")
+			return
+		case <-ticker.C:
+			currentHash := s.getConnectionsFileHash()
+			if currentHash != s.lastConnectionsHash && currentHash != "" {
+				log.Printf("Connections file changed, triggering callback")
+				s.onConnectionsFileChanged()
+				s.lastConnectionsHash = currentHash
+			}
+		}
+	}
+}
+
+func (s *Server) getConnectionsFileHash() string {
+	data, err := os.ReadFile(utils.ConnectionsConfigFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("Warning: Failed to read connections file for hash: %v", err)
+		}
+		return ""
+	}
+
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
+}
+
+func (s *Server) onConnectionsFileChanged() {
+	connectionsConfig, err := utils.LoadConnectionsConfig()
+	if err != nil {
+		log.Printf("Error loading connections config after file change: %v", err)
+		return
+	}
+
+	for _, net := range connectionsConfig.Networks {
+		log.Printf("  - address: %s", net.Address)
+	}
+}
+
+func (s *Server) Stop() {
+	log.Printf("Stopping server...")
+	if s.fileWatcherCancel != nil {
+		s.fileWatcherCancel()
+	}
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

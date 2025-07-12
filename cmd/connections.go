@@ -27,27 +27,14 @@ var connectionsCmd = &cobra.Command{
 		fmt.Printf("Public Key Digest: %s\n", utils.GetPublicKeyDigest(rsaConfig.PublicKey))
 		fmt.Println()
 
-		if len(connectionsConfig.Connections) > 0 {
-			fmt.Println("=== Connected Nodes ===")
-			for i, conn := range connectionsConfig.Connections {
-				fmt.Printf("%d. Type: %s\n", i+1, conn.Type)
-				if conn.DNS != "" {
-					fmt.Printf("   DNS: %s\n", conn.DNS)
-				}
-				fmt.Printf("   Public Key: %s\n", conn.PublicKey)
-
-				if conn.WGAddress != "" {
-					fmt.Printf("   WG Address: %s\n", conn.WGAddress)
-				}
-
-				if conn.WGNetworkBlock != "" {
-					fmt.Printf("   WG Network Block: %s\n", conn.WGNetworkBlock)
-				}
-
+		if len(connectionsConfig.Networks) > 0 {
+			fmt.Println("=== Networks ===")
+			for _, net := range connectionsConfig.Networks {
+				fmt.Printf("   Peers: %d\n", len(net.Peers))
 				fmt.Println()
 			}
 		} else {
-			fmt.Println("No connections found.")
+			fmt.Println("No networks found.")
 		}
 
 		if len(connectionsConfig.AllowedKeys) > 0 {

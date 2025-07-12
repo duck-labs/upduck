@@ -18,7 +18,7 @@ var connectCmd = &cobra.Command{
 	Long:  `Connect this server to a tower node. The tower must have allowed this server's public key first.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		towerDNS := args[0]
+		towerAddress := args[0]
 
 		wgConfig, err := utils.LoadWireguardConfig()
 		if err != nil {
@@ -40,7 +40,7 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal request: %w", err)
 		}
 
-		url := fmt.Sprintf("http://%s:8080/api/servers/connect", towerDNS)
+		url := fmt.Sprintf("http://%s/api/servers/connect", towerAddress)
 		fmt.Printf("Connecting to tower at %s...\n", url)
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestData))
@@ -63,25 +63,26 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("failed to load connections config: %w", err)
 		}
 
-		newConnection := types.Connection{
-			Type:           "tower",
-			DNS:            towerDNS,
-			PublicKey:      response.PublicKey,
-			WGPublicKey:    response.WGPublicKey,
-			WGAddress:      response.WGAddress,
-			WGNetworkBlock: response.WGNetworkBlock,
+		peer := types.Peer{
+			PublicKey: response.WGPublicKey,
+			Address:   response.WGNetworkBlock,
+			Endpoint:  towerAddress,
 		}
 
-		connectionsConfig.Connections = append(connectionsConfig.Connections, newConnection)
+		network := types.Network{
+			Address: response.WGAddress,
+			Peers:   []types.Peer{peer},
+		}
+
+		connectionsConfig.Networks = append(connectionsConfig.Networks, network)
 
 		if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
 			return fmt.Errorf("failed to save connections config: %w", err)
 		}
 
-		fmt.Printf("✅ Successfully connected to tower %s\n", towerDNS)
-		fmt.Printf("Tower public key: %s\n", response.PublicKey)
-		fmt.Printf("WireGuard address: %s\n", response.WGAddress)
-		fmt.Printf("WireGuard network block: %s\n", response.WGNetworkBlock)
+		fmt.Printf("✅ Successfully connected to tower %s\n", towerAddress)
+		fmt.Printf("Network block: %s\n", response.WGNetworkBlock)
+		fmt.Printf("This node address: %s\n", response.WGAddress)
 
 		return nil
 	},
