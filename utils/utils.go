@@ -5,13 +5,17 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/duck-labs/upduck-v2/types"
 )
@@ -36,11 +40,17 @@ func EnsureConfigDir() error {
 	return os.MkdirAll(ConfigDir, 0755)
 }
 
-// TODO: call wireguard command to generate both keys
 func GenerateWireguardKeys() (*types.WireguardConfig, error) {
+	privateKey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey := privateKey.PublicKey().String()
+
 	return &types.WireguardConfig{
-		PrivateKey: "",
-		PublicKey:  "",
+		PrivateKey: privateKey.String(),
+		PublicKey:  publicKey,
 	}, nil
 }
 
@@ -252,4 +262,27 @@ func CreateNginxConfig(domain, serverIP, port string) error {
 
 	enabledPath := filepath.Join("/etc/nginx/sites-enabled", domain)
 	return os.Symlink(configPath, enabledPath)
+}
+
+func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, networkBlock *net.IPNet) (*net.IPNet, error) {
+	used := make(map[uint32]bool)
+	for _, conn := range connectionsConfig.Connections {
+		ipInt := binary.BigEndian.Uint32([]byte(conn.WGAddress))
+		used[ipInt] = true
+	}
+
+	netIP := networkBlock.IP.To4()
+	ipInt := binary.BigEndian.Uint32(netIP)
+	// first address (+0) is the "Network Address"
+	// the last address (+255) is the "Broadcast Address"
+	// the usable ranges between Net+1 and Net+254 (< net + 255)
+	for nextIntIP := ipInt + 1; nextIntIP < ipInt+255; nextIntIP++ {
+		if !used[nextIntIP] {
+			nextNetIP := make(net.IP, 4)
+			binary.BigEndian.PutUint32(nextNetIP, nextIntIP)
+			return &net.IPNet{IP: nextNetIP, Mask: net.CIDRMask(32, 32)}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no allocatable address")
 }

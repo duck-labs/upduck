@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"os/exec"
 
@@ -77,14 +78,22 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: implement address and block generation
-	wgAddress := "10.0.0.2/24"
-	wgNetworkBlock := "10.0.0.0/24"
+	wgNetworkBlock := &net.IPNet{
+		IP:   net.IP{10, 5, 0, 0},
+		Mask: net.CIDRMask(24, 32),
+	}
+
+	wgAddress, err := utils.GetNextAvailableNetworkAddress(connectionsConfig, wgNetworkBlock)
+	if err != nil {
+		log.Printf("Error generating new address: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	response := types.ConnectResponse{
 		WGPublicKey:    wgConfig.PublicKey,
-		WGNetworkBlock: wgNetworkBlock,
-		WGAddress:      wgAddress,
+		WGNetworkBlock: wgNetworkBlock.String(),
+		WGAddress:      wgAddress.String(),
 		PublicKey:      wgConfig.PublicKey,
 	}
 
@@ -93,8 +102,8 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		PublicKeyDigest: pubKeyDigest,
 		PublicKey:       request.PublicKey,
 		WGPublicKey:     request.WGPublicKey,
-		WGAddress:       wgAddress,
-		WGNetworkBlock:  wgNetworkBlock,
+		WGAddress:       wgAddress.String(),
+		WGNetworkBlock:  wgNetworkBlock.String(),
 	}
 
 	connectionsConfig.Connections = append(connectionsConfig.Connections, newConnection)

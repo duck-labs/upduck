@@ -15,6 +15,14 @@ build-all:
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/upduck-darwin-amd64 .
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/upduck-darwin-arm64 .
 
+lint:
+	@echo "==> Running go vet"
+	@go vet ./...
+	@echo "==> Running staticcheck"
+	@staticcheck ./...
+	@echo "==> Running gci"
+	@gci write -s standard -s default -s localmodule --skip-generated .
+
 test:
 	go test ./...
 
