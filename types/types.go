@@ -13,11 +13,10 @@ type RSAKeysConfig struct {
 type Peer struct {
 	PublicKey     string `json:"public_key"`
 	Address     string `json:"address,omitempty"`
-	Endpoint     string `json:"endpoint"`
+	Endpoint     string `json:"endpoint,omitempty"`
 }
 
 type Network struct {
-	NetworkBlock string `json:"network_block,omitempty"`
 	Address string `json:"address,omitempty"`
 	Peers []Peer `json:"peers"`
 }

@@ -112,6 +112,13 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		newNetwork = connectionsConfig.Networks[0]
 	}
 
+	for _, net := range newNetwork.Peers {
+		if request.WGPublicKey == net.PublicKey {
+			http.Error(w, "Already exists", http.StatusConflict)
+			return
+		}
+	}
+
 	newNetwork.Address = wgNetworkBlock.String()
 
 	newPeer := types.Peer{
@@ -149,7 +156,6 @@ func (s *Server) watchConnectionsFile() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	s.lastConnectionsHash = s.getConnectionsFileHash()
 	log.Printf("Started watching connections file: %s", utils.ConnectionsConfigFile)
 
 	for {
@@ -161,7 +167,14 @@ func (s *Server) watchConnectionsFile() {
 			currentHash := s.getConnectionsFileHash()
 			if currentHash != s.lastConnectionsHash && currentHash != "" {
 				log.Printf("Connections file changed, triggering callback")
-				s.onConnectionsFileChanged()
+
+				err := utils.WriteWireguardInterfaces(s.nodeType)
+
+				if err != nil {
+					log.Fatalf("failed to write interface: %v", err)
+					return
+				}
+
 				s.lastConnectionsHash = currentHash
 			}
 		}
@@ -179,18 +192,6 @@ func (s *Server) getConnectionsFileHash() string {
 
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
-}
-
-func (s *Server) onConnectionsFileChanged() {
-	connectionsConfig, err := utils.LoadConnectionsConfig()
-	if err != nil {
-		log.Printf("Error loading connections config after file change: %v", err)
-		return
-	}
-
-	for _, net := range connectionsConfig.Networks {
-		log.Printf("  - address: %s", net.Address)
-	}
 }
 
 func (s *Server) Stop() {

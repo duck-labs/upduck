@@ -14,14 +14,46 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"text/template"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/duck-labs/upduck-v2/types"
 )
 
+const wgConfigTowerTemplate = `[Interface]
+PrivateKey = {{.PrivateKey}}
+ListenPort = 51820
+Address = {{.Address}}
+
+PostUp = iptables -A FORWARD -i "{{.Name}}" -s {{.Address}} -d {{.Address}} -j ACCEPT
+PreDown = iptables -D FORWARD -i "{{.Name}}" -s {{.Address}} -d {{.Address}} -j ACCEPT
+
+PostUp = iptables -A FORWARD -i "{{.Name}}" -s {{.Address}} -j DROP
+PreDown = iptables -D FORWARD -i "{{.Name}}" -s {{.Address}} -j DROP
+
+{{range .Peers}}
+[Peer]
+PublicKey = {{.PublicKey}}
+AllowedIPs = {{.Address}}
+
+{{end}}`
+
+const wgConfigServerTemplate = `[Interface]
+PrivateKey = {{.PrivateKey}}
+Address = {{.Address}}
+
+{{range .Peers}}
+[Peer]
+PublicKey = {{.PublicKey}}
+AllowedIPs = {{.Address}}
+Endpoint = {{.Endpoint}}:51820
+PersistentKeepalive = 25
+{{end}}`
+
 var (
 	ConfigDir             = getConfigDir()
+	WireguardConfigDir    = filepath.Join(ConfigDir, "wg-config")
 	WireguardConfigFile   = filepath.Join(ConfigDir, "wireguard-config.json")
 	ConnectionsConfigFile = filepath.Join(ConfigDir, "connections.json")
 	RSAPublicKey          = filepath.Join(ConfigDir, "public-key.pem")
@@ -40,6 +72,10 @@ func getConfigDir() string {
 
 func EnsureConfigDir() error {
 	return os.MkdirAll(ConfigDir, 0755)
+}
+
+func EnsureWireguardDir() error {
+	return os.MkdirAll(WireguardConfigDir, 0755)
 }
 
 func GenerateWireguardKeys() (*types.WireguardConfig, error) {
@@ -272,7 +308,7 @@ func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, 
 	if len(connectionsConfig.Networks) > 0 {
 		for _, peer := range connectionsConfig.Networks[0].Peers {
 			ipInt := binary.BigEndian.Uint32([]byte(peer.Address))
-		used[ipInt] = true
+			used[ipInt] = true
 		}
 	}
 
@@ -292,5 +328,77 @@ func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, 
 	return nil, fmt.Errorf("no allocatable address")
 }
 
-func WriteWireguardInterface() {
+func WriteWireguardInterfaces(serverType string) error {
+	connectionsConfig, err := LoadConnectionsConfig()
+	if err != nil {
+		return fmt.Errorf("error loading connections: %v", err)
+	}
+
+	wgConfig, err := LoadWireguardConfig()
+	if err != nil {
+		return fmt.Errorf("error loading wireguard config: %v", err)
+	}
+
+	err = EnsureWireguardDir()
+	if err != nil {
+		return fmt.Errorf("failed to create folder: %v", err)
+	}
+
+	var wgTemplate string
+
+	if serverType == "tower" {
+		wgTemplate = wgConfigTowerTemplate
+	}
+
+	if serverType == "server" {
+		wgTemplate = wgConfigServerTemplate
+	}
+
+	for nindex, network := range connectionsConfig.Networks {
+		netName := fmt.Sprintf("upduck-wg-%d", nindex)
+		configPath := fmt.Sprintf("%s/%s.conf", WireguardConfigDir, netName)
+
+		tmpl, err := template.New(netName).Parse(wgTemplate)
+		if err != nil {
+			return err
+		}
+
+		file, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		var peers []map[string]interface{}
+
+		for _, np := range network.Peers {
+			peer := map[string]interface{}{
+				"PublicKey": np.PublicKey,
+				"Address":   np.Address,
+			}
+
+			if serverType == "server" {
+				peer["Endpoint"] = np.Endpoint
+			}
+
+			peers = append(peers, peer)
+		}
+
+		config := map[string]interface{}{
+			"Name":       netName,
+			"PrivateKey": wgConfig.PrivateKey,
+			"Address":    network.Address,
+			"Peers":      peers,
+		}
+
+		err = tmpl.Execute(file, config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func WriteWireguardServerInterfaces() {
 }

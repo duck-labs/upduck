@@ -49,6 +49,10 @@ var connectCmd = &cobra.Command{
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode == http.StatusConflict {
+			return fmt.Errorf("conflict: server already connected to this tower")
+		}
+
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("tower responded with status %d", resp.StatusCode)
 		}
