@@ -355,7 +355,7 @@ func WriteWireguardInterfaces(serverType string) error {
 	}
 
 	for nindex, network := range connectionsConfig.Networks {
-		netName := fmt.Sprintf("upduck-wg-%d", nindex)
+		netName := fmt.Sprintf("upduck-wg-%s-%d", serverType, nindex)
 		configPath := fmt.Sprintf("%s/%s.conf", WireguardConfigDir, netName)
 
 		tmpl, err := template.New(netName).Parse(wgTemplate)
