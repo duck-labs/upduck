@@ -47,6 +47,8 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pubKeyDigest := utils.GetPublicKeyDigest(request.PublicKey)
+
 	connectionsConfig, err := utils.LoadConnectionsConfig()
 	if err != nil {
 		log.Printf("Error loading connections config: %v", err)
@@ -56,14 +58,14 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 
 	allowed := false
 	for _, allowedKey := range connectionsConfig.AllowedKeys {
-		if allowedKey == request.PublicKey {
+		if allowedKey == pubKeyDigest {
 			allowed = true
 			break
 		}
 	}
 
 	if !allowed {
-		log.Printf("Unauthorized connection attempt from public key: %s", utils.GetPublicKeyDigest(request.PublicKey))
+		log.Printf("Unauthorized connection attempt from public key: %s", pubKeyDigest)
 		http.Error(w, "Server public key not allowed", http.StatusUnauthorized)
 		return
 	}
@@ -87,11 +89,12 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newConnection := types.Connection{
-		Type:           "server",
-		PublicKey:      request.PublicKey,
-		WGPublicKey:    request.WGPublicKey,
-		WGAddress:      wgAddress,
-		WGNetworkBlock: wgNetworkBlock,
+		Type:            "server",
+		PublicKeyDigest: pubKeyDigest,
+		PublicKey:       request.PublicKey,
+		WGPublicKey:     request.WGPublicKey,
+		WGAddress:       wgAddress,
+		WGNetworkBlock:  wgNetworkBlock,
 	}
 
 	connectionsConfig.Connections = append(connectionsConfig.Connections, newConnection)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
+
 	"github.com/duck-labs/upduck-v2/types"
 	"github.com/duck-labs/upduck-v2/utils"
 )
@@ -24,8 +25,13 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("failed to load WireGuard config: %w", err)
 		}
 
+		rsaConfig, err := utils.LoadRSAKeys()
+		if err != nil {
+			return fmt.Errorf("failed to load WireGuard config: %w", err)
+		}
+
 		request := types.ConnectRequest{
-			PublicKey:   wgConfig.PublicKey,
+			PublicKey:   rsaConfig.PublicKey,
 			WGPublicKey: wgConfig.PublicKey,
 		}
 

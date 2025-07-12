@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
 	"github.com/duck-labs/upduck-v2/utils"
 )
 
@@ -12,7 +13,7 @@ var connectionsCmd = &cobra.Command{
 	Short: "Show connections and public key information",
 	Long:  `Display information about connected servers/towers and show the public key digest.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		wgConfig, err := utils.LoadWireguardConfig()
+		rsaConfig, err := utils.LoadRSAKeys()
 		if err != nil {
 			return fmt.Errorf("failed to load WireGuard config: %w", err)
 		}
@@ -23,8 +24,7 @@ var connectionsCmd = &cobra.Command{
 		}
 
 		fmt.Println("=== UpDuck Node Information ===")
-		fmt.Printf("Public Key: %s\n", wgConfig.PublicKey)
-		fmt.Printf("Public Key Digest: %s\n", utils.GetPublicKeyDigest(wgConfig.PublicKey))
+		fmt.Printf("Public Key Digest: %s\n", utils.GetPublicKeyDigest(rsaConfig.PublicKey))
 		fmt.Println()
 
 		if len(connectionsConfig.Connections) > 0 {
@@ -35,14 +35,15 @@ var connectionsCmd = &cobra.Command{
 					fmt.Printf("   DNS: %s\n", conn.DNS)
 				}
 				fmt.Printf("   Public Key: %s\n", conn.PublicKey)
-				fmt.Printf("   Public Key Digest: %s\n", utils.GetPublicKeyDigest(conn.PublicKey))
-				fmt.Printf("   WG Public Key: %s\n", conn.WGPublicKey)
+
 				if conn.WGAddress != "" {
 					fmt.Printf("   WG Address: %s\n", conn.WGAddress)
 				}
+
 				if conn.WGNetworkBlock != "" {
 					fmt.Printf("   WG Network Block: %s\n", conn.WGNetworkBlock)
 				}
+
 				fmt.Println()
 			}
 		} else {
@@ -52,7 +53,7 @@ var connectionsCmd = &cobra.Command{
 		if len(connectionsConfig.AllowedKeys) > 0 {
 			fmt.Println("=== Allowed Server Keys ===")
 			for i, key := range connectionsConfig.AllowedKeys {
-				fmt.Printf("%d. %s (digest: %s)\n", i+1, key, utils.GetPublicKeyDigest(key))
+				fmt.Printf("%d. (digest: %s)\n", i+1, key)
 			}
 		}
 

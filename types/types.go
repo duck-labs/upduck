@@ -5,9 +5,15 @@ type WireguardConfig struct {
 	PublicKey  string `json:"public_key"`
 }
 
+type RSAKeysConfig struct {
+	PrivateKey string `json:"-"`
+	PublicKey  string `json:"-"`
+}
+
 type Connection struct {
 	Type          string `json:"type"`
 	DNS           string `json:"dns,omitempty"`
+	PublicKeyDigest     string `json:"public_key_digest"`
 	PublicKey     string `json:"public_key"`
 	WGPublicKey   string `json:"wg_public_key"`
 	WGAddress     string `json:"wg_address,omitempty"`

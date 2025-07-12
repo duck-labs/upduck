@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"github.com/duck-labs/upduck-v2/utils"
 )
 
@@ -40,7 +41,7 @@ The server parameter can be either a server name or IP address from your connect
 		}
 
 		if err := exec.Command("nginx", "-t").Run(); err != nil {
-			return fmt.Errorf("Nginx configuration test failed: %w", err)
+			return fmt.Errorf("nginx configuration test failed: %w", err)
 		}
 
 		if err := exec.Command("systemctl", "reload", "nginx").Run(); err != nil {

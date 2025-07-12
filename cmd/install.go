@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"github.com/duck-labs/upduck-v2/server"
 	"github.com/duck-labs/upduck-v2/utils"
 )
@@ -38,6 +39,18 @@ This command will:
 			fmt.Println("WireGuard is already installed")
 		}
 
+		if _, err := utils.LoadRSAKeys(); err != nil {
+			fmt.Println("Generating credentials...")
+			_, err := utils.GenerateRSAKeys()
+			if err != nil {
+				return fmt.Errorf("failed to generate RSA keys: %w", err)
+			}
+
+			fmt.Printf("RSA keys generated and saved to [%s] and [%s]\n", utils.RSAPrivateKey, utils.RSAPublicKey)
+		} else {
+			fmt.Println("RSA keys already exist")
+		}
+
 		if _, err := utils.LoadWireguardConfig(); err != nil {
 			fmt.Println("Generating WireGuard keys...")
 			wgConfig, err := utils.GenerateWireguardKeys()
@@ -48,7 +61,7 @@ This command will:
 			if err := utils.SaveWireguardConfig(wgConfig); err != nil {
 				return fmt.Errorf("failed to save WireGuard config: %w", err)
 			}
-			fmt.Printf("WireGuard keys generated and saved to %s\n", utils.WireguardConfigFile)
+			fmt.Printf("WireGuard keys generated and saved to [%s]\n", utils.WireguardConfigFile)
 		} else {
 			fmt.Println("WireGuard keys already exist")
 		}
@@ -78,7 +91,7 @@ This command will:
 
 		fmt.Printf("✅ Successfully installed upduck as %s\n", nodeType)
 		fmt.Println("The upduck HTTP server is now running as a systemd service")
-		
+
 		return nil
 	},
 }
