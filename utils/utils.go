@@ -15,7 +15,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"text/template"
+	"time"
 
+	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/duck-labs/upduck-v2/types"
@@ -395,10 +397,42 @@ func WriteWireguardInterfaces(serverType string) error {
 		if err != nil {
 			return err
 		}
+
+		err = startWireGuardInterface(netName, configPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func WriteWireguardServerInterfaces() {
+func startWireGuardInterface(netName string, configPath string) error {
+	wgClient, err := wgctrl.New()
+	if err != nil {
+		return fmt.Errorf("failed to start wgClient: %v", err)
+	}
+
+	_, err = wgClient.Device(netName)
+	if err == nil {
+		downCmd := exec.Command("wg-quick", "down", netName)
+		if err := downCmd.Run(); err != nil {
+			return err
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	upCmd := exec.Command("wg-quick", "up", configPath)
+	output, err := upCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to start WireGuard interface with wg-quick: %w, output: %s", err, string(output))
+	}
+
+	_, err = wgClient.Device(netName)
+	if err != nil {
+		return fmt.Errorf("failed to get WireGuard interface after starting: %w", err)
+	}
+
+	return nil
 }
