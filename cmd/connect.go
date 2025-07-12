@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/spf13/cobra"
@@ -40,7 +41,12 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("failed to marshal request: %w", err)
 		}
 
-		url := fmt.Sprintf("http://%s/api/servers/connect", towerAddress)
+		towerHost, _, err := net.SplitHostPort(towerAddress)
+		if err != nil {
+			return fmt.Errorf("failed to parse tower host: %w", err)
+		}
+
+		url := fmt.Sprintf("https://%s/api/servers/connect", towerAddress)
 		fmt.Printf("Connecting to tower at %s...\n", url)
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestData))
@@ -70,7 +76,7 @@ var connectCmd = &cobra.Command{
 		peer := types.Peer{
 			PublicKey: response.WGPublicKey,
 			Address:   response.WGNetworkBlock,
-			Endpoint:  towerAddress,
+			Endpoint:  towerHost,
 		}
 
 		network := types.Network{

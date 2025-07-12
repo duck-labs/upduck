@@ -357,7 +357,7 @@ func WriteWireguardInterfaces(serverType string) error {
 	}
 
 	for nindex, network := range connectionsConfig.Networks {
-		netName := fmt.Sprintf("upduck-wg-%s-%d", serverType, nindex)
+		netName := fmt.Sprintf("udck-%c%d", serverType[0], nindex)
 		configPath := fmt.Sprintf("%s/%s.conf", WireguardConfigDir, netName)
 
 		tmpl, err := template.New(netName).Parse(wgTemplate)
@@ -426,7 +426,7 @@ func startWireGuardInterface(netName string, configPath string) error {
 	upCmd := exec.Command("wg-quick", "up", configPath)
 	output, err := upCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to start WireGuard interface with wg-quick: %w, output: %s", err, string(output))
+		return fmt.Errorf("failed to start WireGuard interface [%s] with wg-quick: %w, output: %s", configPath, err, string(output))
 	}
 
 	_, err = wgClient.Device(netName)
