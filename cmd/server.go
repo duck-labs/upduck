@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/duck-labs/upduck-v2/server"
+	"github.com/duck-labs/upduck/server"
 )
 
 var (

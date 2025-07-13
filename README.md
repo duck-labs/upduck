@@ -22,7 +22,7 @@ UpDuck is a Golang CLI that helps developers create on-premise datacenters for s
 ### Build from source
 
 ```bash
-git clone https://github.com/duck-labs/upduck-v2.git
+git clone https://github.com/duck-labs/upduck.git
 cd upduck-v2
 make build
 ```

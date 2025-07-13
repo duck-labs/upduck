@@ -1,4 +1,4 @@
-module github.com/duck-labs/upduck-v2
+module github.com/duck-labs/upduck
 
 go 1.23.2
 

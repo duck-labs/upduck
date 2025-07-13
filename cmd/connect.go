@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/duck-labs/upduck-v2/types"
-	"github.com/duck-labs/upduck-v2/utils"
+	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/utils"
 )
 
 var connectCmd = &cobra.Command{

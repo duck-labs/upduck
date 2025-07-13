@@ -12,8 +12,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/duck-labs/upduck-v2/types"
-	"github.com/duck-labs/upduck-v2/utils"
+	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/utils"
 )
 
 type Server struct {

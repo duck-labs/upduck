@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/duck-labs/upduck-v2/cmd"
+	"github.com/duck-labs/upduck/cmd"
 )
 
 func main() {

@@ -2,7 +2,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-LDFLAGS = -ldflags "-X github.com/duck-labs/upduck-v2/cmd.version=$(VERSION) -X github.com/duck-labs/upduck-v2/cmd.commit=$(COMMIT) -X github.com/duck-labs/upduck-v2/cmd.date=$(DATE)"
+LDFLAGS = -ldflags "-X github.com/duck-labs/upduck/cmd.version=$(VERSION) -X github.com/duck-labs/upduck/cmd.commit=$(COMMIT) -X github.com/duck-labs/upduck/cmd.date=$(DATE)"
 
 .PHONY: build test clean install help demo run-tower run-server
 
