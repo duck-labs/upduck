@@ -38,14 +38,6 @@ clean:
 deps:
 	go mod tidy
 
-demo:
-	@echo "Creating demo configuration..."
-	@mkdir -p ./demo-config
-	@echo '{"private_key":"demo-private-key-12345678901234567890123456789012","public_key":"demo-public-key-12345678901234567890123456789012"}' > ./demo-config/wireguard-config.json
-	@echo '{"connections":[],"allowed_keys":["demo-server-public-key-123456789012345678901234567890"]}' > ./demo-config/connections.json
-	@echo "Demo configuration created in ./demo-config/"
-	@echo "To test with demo config, set UPDUCK_CONFIG_DIR=./demo-config"
-
 run-tower: build demo
 	@echo "Starting demo tower server..."
 	UPDUCK_CONFIG_DIR=./demo-config ./upduck server --type=tower --port=8080
