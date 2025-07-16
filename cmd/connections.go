@@ -29,8 +29,19 @@ var connectionsCmd = &cobra.Command{
 
 		if len(connectionsConfig.Networks) > 0 {
 			fmt.Println("=== Networks ===")
-			for _, net := range connectionsConfig.Networks {
+			for i, net := range connectionsConfig.Networks {
+				fmt.Printf("Network %d:\n", i+1)
+				fmt.Printf("   ID: %s\n", net.ID)
+				fmt.Printf("   Address: %s\n", net.Address)
 				fmt.Printf("   Peers: %d\n", len(net.Peers))
+				for j, peer := range net.Peers {
+					fmt.Printf("   Peer %d:\n", j+1)
+					fmt.Printf("      ID: %s\n", peer.ID)
+					fmt.Printf("      Address: %s\n", peer.Address)
+					if peer.Endpoint != "" {
+						fmt.Printf("      Endpoint: %s\n", peer.Endpoint)
+					}
+				}
 				fmt.Println()
 			}
 		} else {

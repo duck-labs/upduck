@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/oklog/ulid/v2"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
@@ -58,6 +59,7 @@ var (
 	WireguardConfigDir    = filepath.Join(ConfigDir, "wg-config")
 	WireguardConfigFile   = filepath.Join(ConfigDir, "wireguard-config.json")
 	ConnectionsConfigFile = filepath.Join(ConfigDir, "connections.json")
+	NodeConfigFile        = filepath.Join(ConfigDir, "config.json")
 	RSAPublicKey          = filepath.Join(ConfigDir, "public-key.pem")
 	RSAPrivateKey         = filepath.Join(ConfigDir, "private-key.pem")
 )
@@ -114,6 +116,41 @@ func LoadWireguardConfig() (*types.WireguardConfig, error) {
 	}
 
 	var config types.WireguardConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func WriteConfigFile(nodeType string) error {
+	if err := EnsureConfigDir(); err != nil {
+		return err
+	}
+
+	config := types.NodeConfig{
+		Type: nodeType,
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(NodeConfigFile, data, 0600)
+}
+
+func LoadConfig() (*types.NodeConfig, error) {
+	data, err := os.ReadFile(NodeConfigFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("not configured")
+		}
+
+		return nil, err
+	}
+
+	var config types.NodeConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
@@ -330,6 +367,32 @@ func GetNextAvailableNetworkAddress(connectionsConfig *types.ConnectionsConfig, 
 	return nil, fmt.Errorf("no allocatable address")
 }
 
+func GetNextAvailableNetworkBlock(connectionsConfig *types.ConnectionsConfig) (*net.IPNet, error) {
+	usedSubnets := make(map[int]bool)
+
+	for _, network := range connectionsConfig.Networks {
+		_, netBlock, err := net.ParseCIDR(network.Address)
+		if err != nil {
+			continue
+		}
+
+		if len(netBlock.IP) >= 3 && netBlock.IP[0] == 10 && netBlock.IP[1] == 5 {
+			usedSubnets[int(netBlock.IP[2])] = true
+		}
+	}
+
+	for subnet := 0; subnet < 256; subnet++ {
+		if !usedSubnets[subnet] {
+			return &net.IPNet{
+				IP:   net.IP{10, 5, byte(subnet), 0},
+				Mask: net.CIDRMask(24, 32),
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no available network blocks in 10.5.x.0/24 range")
+}
+
 func WriteWireguardInterfaces(serverType string) error {
 	connectionsConfig, err := LoadConnectionsConfig()
 	if err != nil {
@@ -435,4 +498,31 @@ func startWireGuardInterface(netName string, configPath string) error {
 	}
 
 	return nil
+}
+
+func GenerateTimeOrderedID() string {
+	entropy := ulid.Monotonic(rand.Reader, 0)
+	return ulid.MustNew(ulid.Timestamp(time.Now()), entropy).String()
+}
+
+func ResolveServerToIP(connectionsConfig *types.ConnectionsConfig, server string) (string, error) {
+	if net.ParseIP(server) != nil {
+		return server, nil
+	}
+
+	for _, network := range connectionsConfig.Networks {
+		for _, peer := range network.Peers {
+			if peer.ID == server {
+				ip, _, err := net.ParseCIDR(peer.Address)
+
+				if err != nil {
+					return "", fmt.Errorf("failed to parse address")
+				}
+
+				return ip.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("server '%s' not found in connections", server)
 }

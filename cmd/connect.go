@@ -14,12 +14,13 @@ import (
 )
 
 var connectCmd = &cobra.Command{
-	Use:   "connect [tower-dns]",
+	Use:   "connect <tower-dns> <network-id>",
 	Short: "Connect to a tower (server command)",
 	Long:  `Connect this server to a tower node. The tower must have allowed this server's public key first.`,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		towerAddress := args[0]
+		networkID := args[1]
 
 		wgConfig, err := utils.LoadWireguardConfig()
 		if err != nil {
@@ -46,7 +47,8 @@ var connectCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse tower host: %w", err)
 		}
 
-		url := fmt.Sprintf("https://%s/api/servers/connect", towerAddress)
+		// TODO: support https and http
+		url := fmt.Sprintf("http://%s/api/servers/network/%s/connect", towerAddress, networkID)
 		fmt.Printf("Connecting to tower at %s...\n", url)
 
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestData))
@@ -74,17 +76,30 @@ var connectCmd = &cobra.Command{
 		}
 
 		peer := types.Peer{
+			ID:        response.PeerID,
 			PublicKey: response.WGPublicKey,
 			Address:   response.WGNetworkBlock,
 			Endpoint:  towerHost,
 		}
 
-		network := types.Network{
-			Address: response.WGAddress,
-			Peers:   []types.Peer{peer},
+		var existingNetworkIndex = -1
+		for i, network := range connectionsConfig.Networks {
+			if network.ID == response.NetworkID {
+				existingNetworkIndex = i
+				break
+			}
 		}
 
-		connectionsConfig.Networks = append(connectionsConfig.Networks, network)
+		if existingNetworkIndex >= 0 {
+			connectionsConfig.Networks[existingNetworkIndex].Peers = append(connectionsConfig.Networks[existingNetworkIndex].Peers, peer)
+		} else {
+			network := types.Network{
+				ID:      response.NetworkID,
+				Address: response.WGAddress,
+				Peers:   []types.Peer{peer},
+			}
+			connectionsConfig.Networks = append(connectionsConfig.Networks, network)
+		}
 
 		if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
 			return fmt.Errorf("failed to save connections config: %w", err)

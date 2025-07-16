@@ -66,6 +66,11 @@ This command will:
 			fmt.Println("WireGuard keys already exist")
 		}
 
+		err := utils.WriteConfigFile(nodeType)
+		if err != nil {
+			return fmt.Errorf("failed to write config file: %w", err)
+		}
+
 		switch nodeType {
 		case "server":
 			if !utils.IsK3sInstalled() {

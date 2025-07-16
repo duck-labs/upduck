@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -17,7 +16,7 @@ var dnsCmd = &cobra.Command{
 }
 
 var dnsForwardCmd = &cobra.Command{
-	Use:   "forward [domain] [server] [server-local-address:port]",
+	Use:   "forward [domain] [server] [port]",
 	Short: "Forward domain to server (tower command)",
 	Long: `Create an Nginx configuration to forward a domain to a specific server's private IP and port.
 The server parameter can be either a server name or IP address from your connections.`,
@@ -25,18 +24,22 @@ The server parameter can be either a server name or IP address from your connect
 	RunE: func(cmd *cobra.Command, args []string) error {
 		domain := args[0]
 		server := args[1]
-		addressPort := args[2]
+		serverPort := args[2]
 
-		parts := strings.Split(addressPort, ":")
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid address:port format: %s (expected format: IP:PORT)", addressPort)
+		// Load connections to resolve server name/ID to IP address
+		connectionsConfig, err := utils.LoadConnectionsConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load connections config: %w", err)
 		}
-		serverIP := parts[0]
-		port := parts[1]
 
-		fmt.Printf("Configuring DNS forwarding for %s -> %s:%s (via %s)\n", domain, serverIP, port, server)
+		serverIP, err := utils.ResolveServerToIP(connectionsConfig, server)
+		if err != nil {
+			return fmt.Errorf("failed to resolve server '%s': %w", server, err)
+		}
 
-		if err := utils.CreateNginxConfig(domain, serverIP, port); err != nil {
+		fmt.Printf("Configuring DNS forwarding for %s -> %s:%s (via %s)\n", domain, serverIP, serverPort, server)
+
+		if err := utils.CreateNginxConfig(domain, serverIP, serverPort); err != nil {
 			return fmt.Errorf("failed to create Nginx config: %w", err)
 		}
 
@@ -49,7 +52,7 @@ The server parameter can be either a server name or IP address from your connect
 		}
 
 		fmt.Printf("✅ Successfully configured DNS forwarding for %s\n", domain)
-		fmt.Printf("Domain %s will now forward to %s:%s\n", domain, serverIP, port)
+		fmt.Printf("Domain %s will now forward to %s:%s\n", domain, serverIP, serverPort)
 
 		return nil
 	},

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/duck-labs/upduck/types"
@@ -37,7 +38,7 @@ func NewServer(nodeType, port string) *Server {
 func (s *Server) Start() error {
 	go s.watchConnectionsFile()
 
-	http.HandleFunc("/api/servers/connect", s.handleServerConnect)
+	http.HandleFunc("/api/servers/network/", s.handleServerConnect)
 	http.HandleFunc("/health", s.handleHealth)
 
 	log.Printf("Starting UpDuck %s server on port %s", s.nodeType, s.port)
@@ -55,6 +56,14 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/servers/network/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 || parts[1] != "connect" {
+		http.Error(w, "Invalid URL format. Expected: /api/servers/network/{networkID}/connect", http.StatusBadRequest)
+		return
+	}
+	networkID := parts[0]
 
 	var request types.ConnectRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -85,6 +94,28 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var targetNetwork *types.Network
+	var networkIndex int
+	for i, network := range connectionsConfig.Networks {
+		if network.ID == networkID {
+			targetNetwork = &connectionsConfig.Networks[i]
+			networkIndex = i
+			break
+		}
+	}
+
+	if targetNetwork == nil {
+		http.Error(w, "Network not found", http.StatusNotFound)
+		return
+	}
+
+	for _, peer := range targetNetwork.Peers {
+		if request.WGPublicKey == peer.PublicKey {
+			http.Error(w, "Server already connected to this network", http.StatusConflict)
+			return
+		}
+	}
+
 	wgConfig, err := utils.LoadWireguardConfig()
 	if err != nil {
 		log.Printf("Error loading WireGuard config: %v", err)
@@ -92,9 +123,11 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wgNetworkBlock := &net.IPNet{
-		IP:   net.IP{10, 5, 0, 0},
-		Mask: net.CIDRMask(24, 32),
+	_, wgNetworkBlock, err := net.ParseCIDR(targetNetwork.Address)
+	if err != nil {
+		log.Printf("Error parsing network address: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	wgAddress, err := utils.GetNextAvailableNetworkAddress(connectionsConfig, wgNetworkBlock)
@@ -104,30 +137,13 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var newNetwork types.Network
-
-	if len(connectionsConfig.Networks) == 0 {
-		newNetwork = types.Network{}
-	} else {
-		newNetwork = connectionsConfig.Networks[0]
-	}
-
-	for _, net := range newNetwork.Peers {
-		if request.WGPublicKey == net.PublicKey {
-			http.Error(w, "Already exists", http.StatusConflict)
-			return
-		}
-	}
-
-	newNetwork.Address = wgNetworkBlock.String()
-
 	newPeer := types.Peer{
+		ID:        utils.GenerateTimeOrderedID(),
 		PublicKey: request.WGPublicKey,
 		Address:   wgAddress.String(),
 	}
 
-	newNetwork.Peers = append(newNetwork.Peers, newPeer)
-	connectionsConfig.Networks = []types.Network{newNetwork}
+	connectionsConfig.Networks[networkIndex].Peers = append(connectionsConfig.Networks[networkIndex].Peers, newPeer)
 
 	if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
 		log.Printf("Error saving connections config: %v", err)
@@ -140,6 +156,8 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		WGNetworkBlock: wgNetworkBlock.String(),
 		WGAddress:      wgAddress.String(),
 		PublicKey:      wgConfig.PublicKey,
+		PeerID:         newPeer.ID,
+		NetworkID:      targetNetwork.ID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -149,7 +167,7 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("✅ Server connected: %s", utils.GetPublicKeyDigest(request.PublicKey))
+	log.Printf("✅ Server connected to network %s: %s", networkID, utils.GetPublicKeyDigest(request.PublicKey))
 }
 
 func (s *Server) watchConnectionsFile() {
@@ -199,6 +217,8 @@ func (s *Server) Stop() {
 	if s.fileWatcherCancel != nil {
 		s.fileWatcherCancel()
 	}
+
+	// TODO: turn off all wireguard interfaces
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
