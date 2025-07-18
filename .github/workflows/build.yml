@@ -8,10 +8,6 @@ on:
         required: true
         type: string
 
-defaults:
-  run:
-    working-directory: ./cli
-
 permissions:
   contents: write
   pull-requests: write
@@ -53,7 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./cli/build/${{ inputs.version }}/upduck-linux-amd64
+          asset_path: ./build/${{ inputs.version }}/upduck-linux-amd64
           asset_name: upduck-linux-amd64
           asset_content_type: application/binary          
       - name: Upload release linux arm64 artifact
@@ -62,11 +58,11 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./cli/build/${{ inputs.version }}/upduck-linux-arm64
+          asset_path: ./build/${{ inputs.version }}/upduck-linux-arm64
           asset_name: upduck-linux-arm64
           asset_content_type: application/binary
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries
-          path: ./cli/build
+          path: ./build
