@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/duck-labs/upduck/pkg/api"
+	"github.com/duck-labs/upduck/pkg/config"
 )
 
 var (
-	serverNodeType string
-	serverPort     string
+	serverPort string
 )
 
 func getServerCommand() *cobra.Command {
@@ -23,15 +24,16 @@ func getServerCommand() *cobra.Command {
 		Long:   `Start the upduck HTTP server that handles API requests.`,
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if serverNodeType == "" {
-				return fmt.Errorf("node type must be specified with --type flag")
+			nodeConfig, err := config.LoadNodeConfig()
+			if err != nil {
+				log.Fatalf("failed to load config file")
 			}
 
-			if serverNodeType != "server" && serverNodeType != "tower" {
-				return fmt.Errorf("invalid node type: %s (must be 'server' or 'tower')", serverNodeType)
+			if nodeConfig.Type != "server" && nodeConfig.Type != "tower" {
+				return fmt.Errorf("invalid node type: %s (must be 'server' or 'tower')", nodeConfig.Type)
 			}
 
-			srv := api.NewServer(serverNodeType, serverPort)
+			srv := api.NewServer(nodeConfig.Type, serverPort)
 
 			sigChan := make(chan os.Signal, 1)
 			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -50,7 +52,6 @@ func getServerCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&serverNodeType, "type", "", "Node type (server or tower)")
 	cmd.Flags().StringVar(&serverPort, "port", "8080", "Port to listen on")
 	cmd.MarkFlagRequired("type")
 

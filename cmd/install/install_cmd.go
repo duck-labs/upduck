@@ -119,13 +119,13 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=%s server --type=%s
+ExecStart=%s server
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-`, nodeType, execPath, nodeType)
+`, execPath, nodeType)
 
 	serviceFile := "/etc/systemd/system/upduck.service"
 	if err := os.WriteFile(serviceFile, []byte(serviceContent), 0644); err != nil {
