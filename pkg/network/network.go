@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"text/template"
 	"time"
 
@@ -146,12 +147,12 @@ func WriteWireguardInterfaces(serverType string) error {
 
 		tmpl, err := template.New(netName).Parse(wgTemplate)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse template: %v", err)
 		}
 
 		file, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open wg file: %v", err)
 		}
 		defer file.Close()
 
@@ -179,12 +180,12 @@ func WriteWireguardInterfaces(serverType string) error {
 
 		err = tmpl.Execute(file, wgInterfaceConfig)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to execute template: %v", err)
 		}
 
 		err = startWireGuardInterface(netName, configPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to start wg interface: %v", err)
 		}
 	}
 
@@ -199,9 +200,12 @@ func startWireGuardInterface(netName string, configPath string) error {
 
 	_, err = wgClient.Device(netName)
 	if err == nil {
-		downCmd := exec.Command("wg-quick", "down", netName)
-		if err := downCmd.Run(); err != nil {
-			return err
+		downCmd := exec.Command("wg-quick", "down", configPath)
+		output, err := downCmd.CombinedOutput()
+		if err != nil {
+			if !strings.Contains(string(output), "does not exist") {
+				return fmt.Errorf("failed to stop wg interface: %v | %s", err, string(output))
+			}
 		}
 
 		time.Sleep(1 * time.Second)
@@ -210,12 +214,12 @@ func startWireGuardInterface(netName string, configPath string) error {
 	upCmd := exec.Command("wg-quick", "up", configPath)
 	output, err := upCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to start WireGuard interface [%s] with wg-quick: %w, output: %s", configPath, err, string(output))
+		return fmt.Errorf("failed to start wg interface: %v | %s", err, string(output))
 	}
 
 	_, err = wgClient.Device(netName)
 	if err != nil {
-		return fmt.Errorf("failed to get WireGuard interface after starting: %w", err)
+		return fmt.Errorf("failed to get wg interface after starting: %v", err)
 	}
 
 	return nil
