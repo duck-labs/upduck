@@ -1,4 +1,4 @@
-package server
+package api
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/duck-labs/upduck/pkg/config"
+	"github.com/duck-labs/upduck/pkg/crypto"
+	"github.com/duck-labs/upduck/pkg/network"
 	"github.com/duck-labs/upduck/types"
-	"github.com/duck-labs/upduck/utils"
 )
 
 type Server struct {
@@ -23,6 +24,7 @@ type Server struct {
 	fileWatcherCtx      context.Context
 	fileWatcherCancel   context.CancelFunc
 	lastConnectionsHash string
+	httpServer          *http.Server
 }
 
 func NewServer(nodeType, port string) *Server {
@@ -32,6 +34,9 @@ func NewServer(nodeType, port string) *Server {
 		port:              port,
 		fileWatcherCtx:    ctx,
 		fileWatcherCancel: cancel,
+		httpServer: &http.Server{
+			Addr: ":" + port,
+		},
 	}
 }
 
@@ -43,7 +48,7 @@ func (s *Server) Start() error {
 
 	log.Printf("Starting UpDuck %s server on port %s", s.nodeType, s.port)
 	log.Printf("File watcher started for connections config")
-	return http.ListenAndServe(":"+s.port, nil)
+	return s.httpServer.ListenAndServe()
 }
 
 func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
@@ -71,9 +76,9 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pubKeyDigest := utils.GetPublicKeyDigest(request.PublicKey)
+	pubKeyDigest := crypto.GetPublicKeyDigest(request.PublicKey)
 
-	connectionsConfig, err := utils.LoadConnectionsConfig()
+	connectionsConfig, err := config.LoadConnectionsConfig()
 	if err != nil {
 		log.Printf("Error loading connections config: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -96,8 +101,8 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 
 	var targetNetwork *types.Network
 	var networkIndex int
-	for i, network := range connectionsConfig.Networks {
-		if network.ID == networkID {
+	for i, netw := range connectionsConfig.Networks {
+		if netw.ID == networkID {
 			targetNetwork = &connectionsConfig.Networks[i]
 			networkIndex = i
 			break
@@ -116,7 +121,7 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	wgConfig, err := utils.LoadWireguardConfig()
+	wgConfig, err := config.LoadWireguardConfig()
 	if err != nil {
 		log.Printf("Error loading WireGuard config: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -130,7 +135,7 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wgAddress, err := utils.GetNextAvailableNetworkAddress(connectionsConfig, wgNetworkBlock)
+	wgAddress, err := network.GetNextAvailableNetworkAddress(connectionsConfig, wgNetworkBlock)
 	if err != nil {
 		log.Printf("Error generating new address: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -138,14 +143,14 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newPeer := types.Peer{
-		ID:        utils.GenerateTimeOrderedID(),
+		ID:        network.GenerateTimeOrderedID(),
 		PublicKey: request.WGPublicKey,
 		Address:   wgAddress.String(),
 	}
 
 	connectionsConfig.Networks[networkIndex].Peers = append(connectionsConfig.Networks[networkIndex].Peers, newPeer)
 
-	if err := utils.SaveConnectionsConfig(connectionsConfig); err != nil {
+	if err := config.SaveConnectionsConfig(connectionsConfig); err != nil {
 		log.Printf("Error saving connections config: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -167,32 +172,26 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("✅ Server connected to network %s: %s", networkID, utils.GetPublicKeyDigest(request.PublicKey))
+	log.Printf("✅ Server connected to network %s: %s", networkID, crypto.GetPublicKeyDigest(request.PublicKey))
 }
 
 func (s *Server) watchConnectionsFile() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-
-	log.Printf("Started watching connections file: %s", utils.ConnectionsConfigFile)
 
 	for {
 		select {
 		case <-s.fileWatcherCtx.Done():
-			log.Printf("File watcher stopped")
 			return
 		case <-ticker.C:
 			currentHash := s.getConnectionsFileHash()
 			if currentHash != s.lastConnectionsHash && currentHash != "" {
-				log.Printf("Connections file changed, triggering callback")
-
-				err := utils.WriteWireguardInterfaces(s.nodeType)
-
-				if err != nil {
-					log.Fatalf("failed to write interface: %v", err)
-					return
+				log.Printf("Connections file changed, reloading WireGuard interfaces...")
+				if err := network.WriteWireguardInterfaces(s.nodeType); err != nil {
+					log.Printf("Error writing WireGuard interfaces: %v", err)
+				} else {
+					log.Printf("WireGuard interfaces updated successfully")
 				}
-
 				s.lastConnectionsHash = currentHash
 			}
 		}
@@ -200,7 +199,7 @@ func (s *Server) watchConnectionsFile() {
 }
 
 func (s *Server) getConnectionsFileHash() string {
-	data, err := os.ReadFile(utils.ConnectionsConfigFile)
+	data, err := os.ReadFile(config.ConnectionsConfigFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Printf("Warning: Failed to read connections file for hash: %v", err)
@@ -213,12 +212,14 @@ func (s *Server) getConnectionsFileHash() string {
 }
 
 func (s *Server) Stop() {
-	log.Printf("Stopping server...")
-	if s.fileWatcherCancel != nil {
-		s.fileWatcherCancel()
+	s.fileWatcherCancel()
+
+	if err := s.httpServer.Shutdown(context.Background()); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+		s.httpServer.Close()
 	}
 
-	// TODO: turn off all wireguard interfaces
+	log.Printf("Server stopped successfully")
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -227,9 +228,4 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status":    "healthy",
 		"node_type": s.nodeType,
 	})
-}
-
-func RunCommand(command string, args ...string) error {
-	cmd := exec.Command(command, args...)
-	return cmd.Run()
 }

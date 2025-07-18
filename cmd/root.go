@@ -5,7 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/duck-labs/upduck/utils"
+	"github.com/duck-labs/upduck/cmd/dns"
+	"github.com/duck-labs/upduck/cmd/install"
+	"github.com/duck-labs/upduck/cmd/network"
+	"github.com/duck-labs/upduck/cmd/server"
+	"github.com/duck-labs/upduck/cmd/version"
+	"github.com/duck-labs/upduck/pkg/config"
 )
 
 var rootCmd = &cobra.Command{
@@ -15,42 +20,30 @@ var rootCmd = &cobra.Command{
 for self-hosted applications using existing tools like WireGuard, K3s, and Nginx.`,
 }
 
-var networkCmd = &cobra.Command{
-	Use:   "network",
-	Short: "Network management commands",
-	Long:  `Manage virtual networks for server connections.`,
-}
-
 func Execute() error {
 	return rootCmd.Execute()
 }
 
 func init() {
-	config, err := utils.LoadConfig()
+	nodeConfig, err := config.LoadNodeConfig()
 	if err != nil {
 		if err.Error() == "not configured" {
-			rootCmd.AddCommand(installCmd)
-			rootCmd.AddCommand(versionCmd)
+			rootCmd.AddCommand(install.GetInstallCommand())
+			rootCmd.AddCommand(version.GetVersionCommand())
 			return
-
 		} else {
 			log.Fatalf("failed to load config file")
 			return
 		}
 	}
 
-	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(server.GetServerCommand())
+
+	networkCmd := network.GetNetworkCommand()
+
+	if nodeConfig.Type == "tower" {
+		rootCmd.AddCommand(dns.GetDNSCommand())
+	}
+
 	rootCmd.AddCommand(networkCmd)
-	networkCmd.AddCommand(connectionsCmd)
-
-	if config.Type == "tower" {
-		rootCmd.AddCommand(dnsCmd)
-		networkCmd.AddCommand(allowCmd)
-		networkCmd.AddCommand(networkCreateCmd)
-	}
-
-	if config.Type == "server" {
-		networkCmd.AddCommand(connectCmd)
-
-	}
 }
