@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Binary version'
+        required: true
+        type: string
+
+defaults:
+  run:
+    working-directory: ./cli
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install qemu for ARM64 emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+      - name: Create Version Folder
+        run: mkdir -p ./build/${{ inputs.version }}
+      - name: Build Binary (amd64)
+        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-amd64 .
+      - name: Build Binary (arm64)
+        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-arm64 .
+        env:
+          GOOS: linux
+          GOARCH: arm64
+      - name: Create Release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          release_name: ${{ inputs.version }}
+          tag_name: ${{ inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload release linux amd64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./cli/build/${{ inputs.version }}/upduck-linux-amd64
+          asset_name: upduck-linux-amd64
+          asset_content_type: application/binary          
+      - name: Upload release linux arm64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./cli/build/${{ inputs.version }}/upduck-linux-arm64
+          asset_name: upduck-linux-arm64
+          asset_content_type: application/binary
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: ./cli/build
