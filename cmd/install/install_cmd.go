@@ -13,7 +13,7 @@ import (
 )
 
 func getInstallCommand() *cobra.Command {
-	return &cobra.Command{
+	installCmd := &cobra.Command{
 		Use:   "install [server|tower]",
 		Short: "Install and configure upduck as server or tower",
 		Long: `Install and configure upduck as either a server or tower node.
@@ -104,6 +104,10 @@ This command will:
 			return nil
 		},
 	}
+
+	installCmd.AddCommand(getServiceCommand())
+
+	return installCmd
 }
 
 func createSystemdService(nodeType string) error {
@@ -145,4 +149,40 @@ WantedBy=multi-user.target
 	}
 
 	return nil
+}
+
+func getServiceCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "service",
+		Short: "Recreate the systemd service",
+		Long:  "Recreate the systemd service for upduck based on the current node configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println("Recreating upduck systemd service...")
+
+			if os.Geteuid() != 0 {
+				return fmt.Errorf("this command must be run as root (use sudo)")
+			}
+
+			nodeConfig, err := config.LoadNodeConfig()
+			if err != nil {
+				return fmt.Errorf("failed to load node configuration: %w", err)
+			}
+
+			if nodeConfig.Type == "" {
+				return fmt.Errorf("node type not configured - run 'upduck install [server|tower]' first")
+			}
+
+			fmt.Println("Stopping existing service...")
+			system.RunCommand("systemctl", "stop", "upduck")
+
+			if err := createSystemdService(nodeConfig.Type); err != nil {
+				return fmt.Errorf("failed to recreate systemd service: %w", err)
+			}
+
+			fmt.Printf("✅ Successfully recreated systemd service for %s node\n", nodeConfig.Type)
+			fmt.Println("The upduck HTTP server is now running as a systemd service")
+
+			return nil
+		},
+	}
 }
