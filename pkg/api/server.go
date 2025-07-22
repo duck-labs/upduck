@@ -150,6 +150,14 @@ func (s *Server) handleServerConnect(w http.ResponseWriter, r *http.Request) {
 
 	connectionsConfig.Networks[networkIndex].Peers = append(connectionsConfig.Networks[networkIndex].Peers, newPeer)
 
+	newEncryptionKey := types.EncryptionKey{
+		ID:        newPeer.ID,
+		Type:      "network_peer",
+		PublicKey: request.PublicKey,
+	}
+
+	connectionsConfig.EncryptionKeys = append(connectionsConfig.EncryptionKeys, newEncryptionKey)
+
 	if err := config.SaveConnectionsConfig(connectionsConfig); err != nil {
 		log.Printf("Error saving connections config: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

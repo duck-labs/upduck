@@ -27,9 +27,16 @@ type Network struct {
 	Peers   []Peer `json:"peers"`
 }
 
+type EncryptionKey struct {
+	ID        string `json:"id"`
+	Type 	string `json:"type"`
+	PublicKey string `json:"public_key"`
+}
+
 type ConnectionsConfig struct {
 	Networks []Network `json:"networks"`
 	AllowedKeys []string     `json:"allowed_keys,omitempty"`
+	EncryptionKeys []EncryptionKey `json:"encryption_keys,omitempty"`
 }
 
 type ConnectRequest struct {
