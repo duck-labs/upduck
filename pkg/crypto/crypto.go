@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/duck-labs/upduck/pkg/config"
-	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/pkg/types"
 )
 
 func GenerateRSAKeys() (*types.RSAKeysConfig, error) {

@@ -16,7 +16,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/duck-labs/upduck/pkg/config"
-	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/pkg/types"
 )
 
 const wgConfigTowerTemplate = `[Interface]

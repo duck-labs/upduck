@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/pkg/types"
 )
 
 var (
@@ -101,8 +101,9 @@ func LoadConnectionsConfig() (*types.ConnectionsConfig, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &types.ConnectionsConfig{
-				Networks:    []types.Network{},
-				AllowedKeys: []string{},
+				Networks:       []types.Network{},
+				AllowedKeys:    []string{},
+				EncryptionKeys: []types.EncryptionKey{},
 			}, nil
 		}
 		return nil, err

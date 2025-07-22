@@ -11,7 +11,7 @@ import (
 
 	"github.com/duck-labs/upduck/pkg/config"
 	"github.com/duck-labs/upduck/pkg/crypto"
-	"github.com/duck-labs/upduck/types"
+	"github.com/duck-labs/upduck/pkg/types"
 )
 
 func getConnectCommand() *cobra.Command {

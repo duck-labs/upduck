@@ -29,13 +29,13 @@ type Network struct {
 
 type EncryptionKey struct {
 	ID        string `json:"id"`
-	Type 	string `json:"type"`
+	Type 	  string `json:"type"`
 	PublicKey string `json:"public_key"`
 }
 
 type ConnectionsConfig struct {
-	Networks []Network `json:"networks"`
-	AllowedKeys []string     `json:"allowed_keys,omitempty"`
+	Networks       []Network       `json:"networks"`
+	AllowedKeys    []string        `json:"allowed_keys,omitempty"`
 	EncryptionKeys []EncryptionKey `json:"encryption_keys,omitempty"`
 }
 
@@ -49,6 +49,6 @@ type ConnectResponse struct {
 	WGNetworkBlock string `json:"wg_network_block"`
 	WGAddress      string `json:"wg_address"`
 	PublicKey      string `json:"public_key"`
-	NetworkID string `json:"network_id"`
-	PeerID string `json:"peer_id"`
+	NetworkID      string `json:"network_id"`
+	PeerID         string `json:"peer_id"`
 }
