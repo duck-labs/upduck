@@ -27,9 +27,9 @@ jobs:
       - name: Create Version Folder
         run: mkdir -p ./build/${{ inputs.version }}
       - name: Build Binary (amd64)
-        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-amd64 .
+        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd/version.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-amd64 .
       - name: Build Binary (arm64)
-        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-arm64 .
+        run: go build -ldflags "-X github.com/duck-labs/upduck/cmd/version.version=${{ inputs.version }}" -o ./build/${{ inputs.version }}/upduck-linux-arm64 .
         env:
           GOOS: linux
           GOARCH: arm64
