@@ -37,7 +37,9 @@ func init() {
 		}
 	}
 
+	rootCmd.AddCommand(install.GetReinstallCommand())
 	rootCmd.AddCommand(server.GetServerCommand())
+	rootCmd.AddCommand(version.GetVersionCommand())
 
 	networkCmd := network.GetNetworkCommand()
 
