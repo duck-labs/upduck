@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/spf13/cobra"
 
@@ -44,16 +44,15 @@ func getConnectCommand() *cobra.Command {
 				return fmt.Errorf("failed to marshal request: %w", err)
 			}
 
-			towerHost, _, err := net.SplitHostPort(towerAddress)
+			towerURL, err := url.Parse(towerAddress)
 			if err != nil {
-				return fmt.Errorf("failed to parse tower host: %w", err)
+				return fmt.Errorf("failed to parse tower URL: %w", err)
 			}
 
-			// TODO: support https and http
-			url := fmt.Sprintf("http://%s/api/servers/network/%s/connect", towerAddress, networkID)
-			fmt.Printf("Connecting to tower at %s...\n", url)
+			apiURL := fmt.Sprintf("%s/api/servers/network/%s/connect", towerAddress, networkID)
+			fmt.Printf("Connecting to tower at %s...\n", apiURL)
 
-			resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestData))
+			resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(requestData))
 			if err != nil {
 				return fmt.Errorf("failed to connect to tower: %w", err)
 			}
@@ -81,7 +80,7 @@ func getConnectCommand() *cobra.Command {
 				ID:        response.PeerID,
 				PublicKey: response.WGPublicKey,
 				Address:   response.WGNetworkBlock,
-				Endpoint:  towerHost,
+				Endpoint:  towerURL.Hostname(),
 			}
 
 			var existingNetworkIndex = -1
