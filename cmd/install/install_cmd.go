@@ -125,7 +125,7 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-`, execPath, nodeType)
+`, nodeType, execPath)
 
 	serviceFile := "/etc/systemd/system/upduck.service"
 	if err := os.WriteFile(serviceFile, []byte(serviceContent), 0644); err != nil {
