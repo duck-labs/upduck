@@ -71,8 +71,11 @@ func InstallNginx() error {
 }
 
 func CreateNginxConfig(domain, serverIP, port string) error {
-	configContent := fmt.Sprintf(`server {
-    listen 80;
+	configContent := fmt.Sprintf(`map $http_x_forwarded_proto $forwarded_proto {
+    default $scheme;
+    "~." $http_x_forwarded_proto;
+}
+server {
     server_name %s;
 
     location / {
@@ -80,7 +83,7 @@ func CreateNginxConfig(domain, serverIP, port string) error {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;;
     }
 }`, domain, serverIP, port)
 
