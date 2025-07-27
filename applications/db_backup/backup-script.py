@@ -10,10 +10,8 @@ import argparse
 import subprocess
 import logging
 import datetime
-from pathlib import Path
 from google.cloud import storage
 import tempfile
-import gzip
 
 logging.basicConfig(
     level=logging.INFO,

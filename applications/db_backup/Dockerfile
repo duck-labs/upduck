@@ -1,7 +1,12 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+    
+RUN apt-get update
+
+RUN apt-get install -y \
+    postgresql-client-16 \
     default-mysql-client \
     curl
 
