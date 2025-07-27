@@ -16,11 +16,11 @@ This application is a K8s CronJob meant to be deployed to a kubernetes cluster t
 ### 2. Create Kubernetes Secrets
 
 ```bash
-kubectl create secret generic gcs-service-account \
+kubectl create secret generic gcp-service-account \
   --from-file=key.json=/path/to/your/service-account.json \
   --namespace=postgresql-database-namespace
 
-kubectl create secret generic gcs-service-account \
+kubectl create secret generic gcp-service-account \
   --from-file=key.json=/path/to/your/service-account.json \
   --namespace=mysql-database-namespace
 ```
@@ -70,7 +70,7 @@ spec:
           volumes:
           - name: gcp-service-account
             secret:
-              secretName: gcs-service-account
+              secretName: gcp-service-account
 ```
 > ./postgresql-backup.yaml
 
