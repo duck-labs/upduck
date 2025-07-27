@@ -2,9 +2,8 @@ FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y \
     postgresql-client \
-    mysql-client \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    default-mysql-client \
+    curl
 
 RUN pip install --no-cache-dir \
     google-cloud-storage==2.10.0 \
